@@ -1,0 +1,9 @@
+influx: http://198.18.128.15:8086
+influx_bucket: stealthwatch
+influx_org: helena-gg
+influx_token: wPS7zVcPgxdOV4HEYdX3q9ysCDjUyM6_DtGxY1-mVTyLhDkgkDBco4j9wgQa44rH-S80RNuZclzlt1qqg7keGQ==
+smc: 198.18.128.41
+smc_pass: P@ssw9rd
+smc_tenant_id: 301
+smc_token: 36084cc4-27f3-45d6-a7e6-dbf2e9563bec
+smc_user: api
