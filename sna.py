@@ -14,7 +14,7 @@ requests.packages.urllib3.disable_warnings()
 CONFIG_FILE = "config.yaml"
 SESSION_FILE = "session.pkl"
 
-QUERY_MINUTES = 10
+QUERY_MINUTES = 5
 
 datetime.now(timezone.utc)
 BASE_TIME = datetime.now(timezone.utc)
