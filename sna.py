@@ -14,7 +14,7 @@ requests.packages.urllib3.disable_warnings()
 CONFIG_FILE = "config.yaml"
 SESSION_FILE = "session.pkl"
 
-QUERY_MINUTES = 5
+QUERY_MINUTES = 10
 
 datetime.now(timezone.utc)
 BASE_TIME = datetime.now(timezone.utc)
@@ -222,45 +222,48 @@ inf_token = CONFIG['influx_token']
 inf_org = CONFIG['influx_org']
 inf_bucket = CONFIG['influx_bucket']
 
+
+from influxdb_client import Point, WritePrecision
+
+client = InfluxDBClient(url=inf_url, token=inf_token, org=inf_org)
+write_api = client.write_api(write_options=SYNCHRONOUS)
+
+points = []
 if flows:
-    try:
-        client = InfluxDBClient(url=inf_url, token=inf_token, org=inf_org)
-        write_api = client.write_api(write_options=SYNCHRONOUS)
+    print(f'WRITING {len(flows)} FLOWS | ', end="")
+    for flow in flows:
+        print(".", end="", flush=True)
+        flow_id = flow['id']
+        flow_time = flow['statistics']['firstActiveTime']
+        flow_protocol = flow["protocol"]
+        flow_src = flow['subject']['ipAddress']
+        flow_src_port = flow['subject']['portProtocol']['port']
+        flow_dst = flow['peer']['ipAddress']
+        flow_dst_port = flow['peer']['portProtocol']['port']
+        flow_byte = flow['statistics']['byteCount']
+        flow_packet = flow['statistics']['packetCount']
+        timestamp_ns = int(datetime.strptime(flow_time, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() * 1e9)
 
-        print(f'WRITING {len(flows)} FLOWS | ', end="")
-        for flow in flows:
-            print(".", end="", flush=True)
+        point = (
+            Point("network_flow")
+            .field("id", flow_id)
+            .field("byte", flow_byte)
+            .field("packet", flow_packet)
+            .tag("protocol", flow_protocol)
+            .tag("src_ip", flow_src)
+            .tag("dst_ip", flow_dst)
+            .tag("src_port", flow_src_port)
+            .tag("dst_port", flow_dst_port)
+            .time(timestamp_ns, WritePrecision.NS)
+        )
 
-            flow_id = flow['id']
-            flow_time = flow['statistics']['firstActiveTime']
-            flow_protocol = flow["protocol"]
-            flow_src = flow['subject']['ipAddress']
-            flow_src_port = flow['subject']['portProtocol']['port']
-            flow_dst = flow['peer']['ipAddress']
-            flow_dst_port = flow['peer']['portProtocol']['port']
-            flow_byte = flow['statistics']['byteCount']
-            flow_packet = flow['statistics']['packetCount']
-
-            timestamp_ns = int(datetime.strptime(flow_time, "%Y-%m-%dT%H:%M:%S.%f%z").timestamp() * 1e9)
-
-            point = (
-                Point("network_flow")
-                .field("id", flow_id)
-                .field("byte", flow_byte)
-                .field("packet", flow_packet)
-                .tag("protocol", flow_protocol)
-                .tag("src_ip", flow_src)
-                .tag("dst_ip", flow_dst)
-                .tag("src_port", flow_src_port)
-                .tag("dst_port", flow_dst_port)
-                .time(timestamp_ns, WritePrecision.NS)
-            )
-
-            write_api.write(bucket=inf_bucket, org=inf_org, record=point)
-
-        print(f' | COMPLETED')
-        client.close()
-    except Exception as e:
-        print(f"EXCEPTION | {e}")
+        points.append(point)
 else:
     print('FLOWS EMPTY')
+
+try:
+    write_api.write(bucket=inf_bucket, org=inf_org, record=points)
+    client.close()
+    print(f' | UPLOADED')
+except Exception as e:
+    print(f" | EXCEPTION | {e}")
